@@ -187,7 +187,7 @@
         const HISTORICAL_PROFIT_BASE = 126829;
 
         const STOCK_CODE_MAP = {
-            "士电": "1519", "士電": "1519",
+            "士电": "1503", "士電": "1503",
             "鼎元": "2426",
             "荣科": "4989", "榮科": "4989",
             "尼克森": "3317",
@@ -522,7 +522,7 @@
                     const priceMap = {};
                     result.data.forEach(item => {
                         if (item.Code && item.ClosingPrice) {
-                            priceMap[item.Code.trim()] = parseFloat(String(item.ClosingPrice).replace(/,/g, ''));
+                            priceMap[String(item.Code).trim()] = parseFloat(String(item.ClosingPrice).replace(/,/g, ''));
                         }
                     });
 
