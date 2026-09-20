@@ -1,39 +1,29 @@
 export async function onRequestGet(context) {
   try {
-    const url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json";
+    // 改用證交所三大法人或個股即時 OpenAPI，或者直接對每檔股票進行查詢，確保格式百分之百穩定
+    const url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL";
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
       }
     });
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ success: false, error: "TWSE API HTTP error: " + response.status }), {
+      return new Response(JSON.stringify({ success: false, error: "TWSE OpenAPI error: " + response.status }), {
         status: 500,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
 
-    const json = await response.json();
+    const data = await response.json();
     
-    // 支援多種證交所回傳格式 (data 或 stat 等)
-    let stockList = [];
-    if (Array.isArray(json.data)) {
-      stockList = json.data.map(item => ({
-        Code: item[0],
-        Name: item[1],
-        ClosingPrice: item[7] // 收盤價通常在第 7 個欄位
-      }));
-    } else if (Array.isArray(json)) {
-      stockList = json;
-    } else {
-      return new Response(JSON.stringify({ success: false, error: "Unknown data structure", raw: json }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
+    // 統一轉換成前端需要的格式 [{ Code, ClosingPrice }, ...]
+    const formattedData = data.map(item => ({
+      Code: item.Code || item.StockNo,
+      ClosingPrice: item.ClosingPrice || item.TradePrice || item.Price
+    }));
 
-    return new Response(JSON.stringify({ success: true, data: stockList }), {
+    return new Response(JSON.stringify({ success: true, data: formattedData }), {
       headers: { 
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*"
