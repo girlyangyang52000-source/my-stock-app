@@ -112,8 +112,8 @@
                         <span>庫存股票</span>
                     </label>
                     <input type="text" id="searchStockInput" placeholder="🔍 搜股票(簡繁通用)..." class="px-2 py-0.5 text-xs border rounded-md outline-none w-36 md:w-44 bg-white">
-                    <button type="button" onclick="fetchAllLivePrices()" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
-                        <span id="fetchIcon">🔄</span><span id="fetchText">一鍵自動更新現價</span>
+                    <button type="button" onclick="autoFetchMarketPrices()" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
+                        <span id="fetchIcon">🔄</span><span id="fetchText">從證交所 API 抓取即時時價</span>
                     </button>
                     <span class="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
                         <span class="inline-block w-2 h-2 rounded-full bg-white border border-gray-300 mr-1"></span>白底:庫存 
@@ -141,7 +141,7 @@
                             <th class="py-2 text-left">數量</th>
                             <th class="py-2 text-right">單價</th>
                             <th class="py-2 text-right">結算總額</th>
-                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 現價試算 (一鍵秒速同步)</th>
+                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 即時現價 (點擊按鈕向證交所 API 請求)</th>
                             <th class="py-2 text-right">本次損益</th>
                             <th class="py-2 text-right">報酬率</th>
                             <th class="py-2 text-center rounded-tr-lg">操作</th>
@@ -186,21 +186,21 @@
         const PRIOR_PROFIT = 45000;
         const HISTORICAL_PROFIT_BASE = 126829;
 
-        const INSTANT_MARKET_PRICES = {
-            "士电": 204.5, "士電": 204.5,
-            "鼎元": 101.5,
-            "荣科": 65.2, "榮科": 65.2,
-            "尼克森": 67.8,
-            "南茂": 86.8,
-            "合晶": 108.5,
-            "台玻": 59.2,
-            "精确": 71.5, "精確": 71.5,
-            "日月光": 612,
-            "鸿海": 248, "鴻海": 248,
-            "联电": 123.5, "聯電": 123.5,
-            "雷虎": 181,
-            "晶豪科": 278,
-            "亚电": 78.5, "亞電": 78.5
+        const STOCK_CODE_MAP = {
+            "士电": "1519", "士電": "1519",
+            "鼎元": "2426",
+            "荣科": "4989", "榮科": "4989",
+            "尼克森": "3317",
+            "南茂": "8150",
+            "合晶": "6182",
+            "台玻": "1802",
+            "精确": "3162", "精確": "3162",
+            "日月光": "3711",
+            "鸿海": "2317", "鴻海": "2317",
+            "联电": "2303", "聯電": "2303",
+            "雷虎": "8033",
+            "晶豪科": "3006",
+            "亚电": "4939", "亞電": "4939"
         };
 
         const DEFAULT_RECORDS = [
@@ -304,7 +304,7 @@
             { "id": "1789447063932", "date": "2026-09-15", "type": "SELL", "name": "合晶", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 109623, "isHistorical": false },
             { "id": "1789447089374", "date": "2026-09-15", "type": "BUY", "name": "精确", "quantity": 1, "unit": "张", "shares": 1000, "price": 70.3, "discount": 0.3, "totalAmount": 70330, "isHistorical": false },
             { "id": "1789543482856", "date": "2026-09-16", "type": "SELL", "name": "精确", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 71555, "isHistorical": false },
-            { "id": "1789543509246", "date": "2026-09-16", "type": "BUY", "name": "日月光", "quantity": 100, "unit": "股", "shares": 100, "totalAmount": 60825, "isHistorical": false },
+            { "id": "1789543509246", "date": "2026-09-16", "type": "BUY", "name": "日月光", "quantity": 100, "unit": "股", "shares": 100, "price": 608, "discount": 0.3, "totalAmount": 60825, "isHistorical": false },
             { "id": "1789543656140", "date": "2026-09-16", "type": "SELL", "name": "晶豪科", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 281034, "isHistorical": false },
             { "id": "1789623803210", "date": "2026-09-17", "type": "SELL", "name": "南茂", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 86902, "isHistorical": false },
             { "id": "1789623830277", "date": "2026-09-17", "type": "SELL", "name": "日月光", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 61788, "isHistorical": false },
@@ -314,10 +314,16 @@
         ];
 
         let records = [];
-        records = DEFAULT_RECORDS;
-        localStorage.setItem('stock_flow_records', JSON.stringify(records));
+        const savedRecords = localStorage.getItem('stock_flow_records');
+        if (savedRecords) {
+            try { records = JSON.parse(savedRecords); } catch(e) { records = DEFAULT_RECORDS; }
+        } else {
+            records = DEFAULT_RECORDS;
+            localStorage.setItem('stock_flow_records', JSON.stringify(records));
+        }
 
         const livePriceCache = {};
+
         const TRAD_TO_SIMP = { '鴻': '鸿', '海': '海', '聯': '联', '電': '电', '積': '积', '晶': '晶', '南': '南', '亞': '亚', '科': '科', '致': '致', '光': '光', '創': '创', '群': '群', '旺': '旺', '宏': '宏', '力': '力', '玻': '玻', '台': '台', '臺': '台', '頎': '颀', '邦': '邦', '茂': '茂', '益': '益', '智': '智', '寶': '宝', '雅': '雅', '傑': '杰', '森': '森', '榮': '荣', '虎': '虎', '雷': '雷', '確': '确', '精': '精', '買': '买', '賣': '卖', '庫': '库', '存': '存', '張': '张', '股': '股', '價': '价', '損': '损', '報': '报', '額': '额', '總': '总', '餘': '余', '萬': '万', '現': '现', '算': '算', '鼎': '鼎', '元': '元', '彰': '彰', '銀': '银', '恩': '恩', '德': '德', '士': '士', '豪': '豪' };
 
         function normalizeChinese(text) {
@@ -439,10 +445,10 @@
             return { closedBuyIds, holdingBuyIds, dynamicProfitMap, currentInventoryCost, totalRealizedProfit };
         }
 
-        function calculateLiveSellProfitCorrect(costTotalAmount, shares, livePrice) {
+        function calculateLiveSellProfitCorrect(costTotalAmount, shares, livePrice, discount = 0.3) {
             if (!livePrice || isNaN(livePrice) || livePrice <= 0) return null;
             const gross = livePrice * shares;
-            const fee = Math.max(20, Math.floor(gross * BASE_FEE_RATE));
+            const fee = Math.max(20, Math.floor(gross * BASE_FEE_RATE * discount));
             const tax = Math.floor(gross * TAX_RATE);
             const netIncome = Math.round(gross - fee - tax);
             const profit = netIncome - costTotalAmount;
@@ -450,9 +456,9 @@
             return { netIncome, profit, returnRate };
         }
 
-        function calculateBreakEvenPrice(costAmount, shares) {
+        function calculateBreakEvenPrice(costAmount, shares, discount = 0.3) {
             if (!shares || shares <= 0) return null;
-            const effectiveRate = BASE_FEE_RATE + TAX_RATE;
+            const effectiveRate = (BASE_FEE_RATE * discount) + TAX_RATE;
             return ((costAmount + 20) / (shares * (1 - effectiveRate))).toFixed(2);
         }
 
@@ -461,11 +467,12 @@
             const { holdingBuyIds } = calculateAutoStatus(records);
             records.forEach(r => {
                 if (r.type === 'BUY' && holdingBuyIds.has(String(r.id))) {
-                    const cachedVal = livePriceCache[r.id] !== undefined ? livePriceCache[r.id] : localStorage.getItem(`live_price_${r.id}`);
+                    const cachedVal = livePriceCache[r.id];
                     if (cachedVal !== null && cachedVal !== '' && !isNaN(cachedVal) && parseFloat(cachedVal) > 0) {
                         const totalAmount = Math.abs(parseFloat(r.totalAmount) || 0);
                         const shares = getRecordShares(r);
-                        const calc = calculateLiveSellProfitCorrect(totalAmount, shares, parseFloat(cachedVal));
+                        const discount = r.discount !== undefined ? r.discount : 0.3;
+                        const calc = calculateLiveSellProfitCorrect(totalAmount, shares, parseFloat(cachedVal), discount);
                         if (calc) { totalSimProfit += calc.profit; totalSimCost += totalAmount; hasInput = true; }
                     }
                 }
@@ -484,19 +491,14 @@
             }
         }
 
-        function onLivePriceChange(recordId, costAmount, shares, inputVal) {
+        function onLivePriceChange(recordId, costAmount, shares, discount, inputVal) {
             livePriceCache[recordId] = inputVal;
-            if (inputVal !== null && inputVal !== '' && !isNaN(inputVal) && parseFloat(inputVal) > 0) {
-                localStorage.setItem(`live_price_${recordId}`, inputVal);
-            } else {
-                localStorage.removeItem(`live_price_${recordId}`);
-            }
             const resDiv = document.getElementById(`live-result-${recordId}`);
             const val = parseFloat(inputVal);
             if (isNaN(val) || val <= 0) {
-                if (resDiv) resDiv.innerHTML = `<span class="text-[10px] text-gray-400">保本價 ≈ $${calculateBreakEvenPrice(costAmount, shares)}</span>`;
+                if (resDiv) resDiv.innerHTML = `<span class="text-[10px] text-gray-400">保本價 ≈ $${calculateBreakEvenPrice(costAmount, shares, discount)}</span>`;
             } else {
-                const calc = calculateLiveSellProfitCorrect(costAmount, shares, val);
+                const calc = calculateLiveSellProfitCorrect(costAmount, shares, val, discount);
                 if (calc && resDiv) {
                     resDiv.innerHTML = `<div class="${calc.profit >= 0 ? 'profit' : 'loss'} font-bold leading-tight">${calc.profit > 0 ? '+' : ''}$${calc.profit.toLocaleString()} (${calc.profit > 0 ? '+' : ''}${calc.returnRate}%)</div><div class="text-[9px] text-gray-500">淨收 $${calc.netIncome.toLocaleString()}</div>`;
                 }
@@ -504,36 +506,51 @@
             updateLiveOverallSummary();
         }
 
-        // 完美秒速同步機制（不依賴會出錯的外部伺服器代理，點擊即時完成）
-        async function fetchAllLivePrices() {
+        async function autoFetchMarketPrices() {
             const { holdingBuyIds } = calculateAutoStatus(records);
             const holdingItems = records.filter(r => r.type === 'BUY' && holdingBuyIds.has(String(r.id)));
-            if (holdingItems.length === 0) { alert("目前沒有庫存股票。"); return; }
+            if (holdingItems.length === 0) return;
             
             const btnIcon = document.getElementById('fetchIcon'), btnText = document.getElementById('fetchText');
-            btnIcon.classList.add('animate-spin'); btnText.innerText = "秒速同步中...";
+            btnIcon.classList.add('animate-spin'); btnText.innerText = "正在向證交所 API 請求...";
 
-            let updatedCount = 0;
+            try {
+                const res = await fetch('/stock');
+                const result = await res.json();
+                
+                if (result.success && Array.isArray(result.data)) {
+                    const priceMap = {};
+                    result.data.forEach(item => {
+                        if (item.Code && item.ClosingPrice) {
+                            priceMap[item.Code.trim()] = parseFloat(String(item.ClosingPrice).replace(/,/g, ''));
+                        }
+                    });
 
-            setTimeout(() => {
-                holdingItems.forEach(r => {
-                    const cleanName = r.name.trim().replace(/^[0-9A-Za-z]+/, '').trim();
-                    const livePrice = INSTANT_MARKET_PRICES[r.name.trim()] || INSTANT_MARKET_PRICES[cleanName];
+                    let updatedCount = 0;
+                    holdingItems.forEach(r => {
+                        const cleanName = r.name.trim().replace(/^[0-9A-Za-z]+/, '').trim();
+                        const code = STOCK_CODE_MAP[r.name.trim()] || STOCK_CODE_MAP[cleanName];
+                        const livePrice = code ? priceMap[code] : null;
 
-                    if (livePrice) {
-                        livePriceCache[r.id] = String(livePrice);
-                        localStorage.setItem(`live_price_${r.id}`, String(livePrice));
-                        const inp = document.getElementById(`live-input-${r.id}`);
-                        if (inp) inp.value = livePrice;
-                        onLivePriceChange(r.id, Math.abs(parseFloat(r.totalAmount) || 0), getRecordShares(r), String(livePrice));
-                        updatedCount++;
-                    }
-                });
-
+                        if (livePrice && !isNaN(livePrice) && livePrice > 0) {
+                            livePriceCache[r.id] = String(livePrice);
+                            const inp = document.getElementById(`live-input-${r.id}`);
+                            if (inp) inp.value = livePrice;
+                            const discount = r.discount !== undefined ? r.discount : 0.3;
+                            onLivePriceChange(r.id, Math.abs(parseFloat(r.totalAmount) || 0), getRecordShares(r), discount, String(livePrice));
+                            updatedCount++;
+                        }
+                    });
+                    btnText.innerText = updatedCount > 0 ? `成功抓取 ${updatedCount} 檔時價` : "未在 API 找到對應代號";
+                } else {
+                    btnText.innerText = "API 回應格式異常";
+                }
+            } catch (err) {
+                btnText.innerText = "無法連線至後端 API";
+            } finally {
                 btnIcon.classList.remove('animate-spin');
-                btnText.innerText = `已成功更新 ${updatedCount} 檔現價`;
-                setTimeout(() => { btnText.innerText = "一鍵自動更新現價"; }, 1500);
-            }, 50);
+                setTimeout(() => { btnText.innerText = "從證交所 API 抓取即時時價"; }, 3000);
+            }
         }
 
         function renderTable() {
@@ -556,6 +573,7 @@
                 const isBuy = r.type === 'BUY';
                 const isHolding = isBuy && holdingBuyIds.has(String(r.id));
                 const shares = getRecordShares(r);
+                const discount = r.discount !== undefined ? r.discount : 0.3;
                 let profitHtml = '<span class="text-gray-400">-</span>', returnRateHtml = '<span class="text-gray-400">-</span>', p = null, rr = null;
 
                 if (!isBuy) {
@@ -569,13 +587,8 @@
 
                 let liveSimHtml = '<span class="text-gray-300 text-[10px]">已結清</span>';
                 if (isHolding) {
-                    const cachedVal = livePriceCache[r.id] !== undefined ? livePriceCache[r.id] : (localStorage.getItem(`live_price_${r.id}`) || '');
-                    let initialResult = `<span class="text-[10px] text-gray-400">保本價 ≈ $${calculateBreakEvenPrice(totalAmount, shares)}</span>`;
-                    if (cachedVal) {
-                        const calc = calculateLiveSellProfitCorrect(totalAmount, shares, parseFloat(cachedVal));
-                        if (calc) initialResult = `<div class="${calc.profit >= 0 ? 'profit' : 'loss'} font-bold leading-tight">${calc.profit > 0 ? '+' : ''}$${calc.profit.toLocaleString()} (${calc.profit > 0 ? '+' : ''}${calc.returnRate}%)</div><div class="text-[9px] text-gray-500">淨收 $${calc.netIncome.toLocaleString()}</div>`;
-                    }
-                    liveSimHtml = `<div class="flex items-center gap-1.5 justify-end"><input type="number" step="any" placeholder="現價" value="${cachedVal}" id="live-input-${r.id}" oninput="onLivePriceChange('${r.id}', ${totalAmount}, ${shares}, this.value)" class="w-20 px-1.5 py-0.5 text-xs text-right border border-amber-300 rounded bg-amber-50/50 outline-none font-semibold"><div id="live-result-${r.id}" class="text-right min-w-[82px] text-[10px]">${initialResult}</div></div>`;
+                    let initialResult = `<span class="text-[10px] text-gray-400">保本價 ≈ $${calculateBreakEvenPrice(totalAmount, shares, discount)}</span>`;
+                    liveSimHtml = `<div class="flex items-center gap-1.5 justify-end"><input type="number" step="any" placeholder="現價" value="" id="live-input-${r.id}" oninput="onLivePriceChange('${r.id}', ${totalAmount}, ${shares}, ${discount}, this.value)" class="w-20 px-1.5 py-0.5 text-xs text-right border border-amber-300 rounded bg-amber-50/50 outline-none font-semibold"><div id="live-result-${r.id}" class="text-right min-w-[82px] text-[10px]">${initialResult}</div></div>`;
                 }
 
                 const tr = document.createElement('tr');
@@ -593,7 +606,7 @@
                     <td class="py-2 text-center">
                         <button type="button" onclick="openEditModal('${r.id}')" class="text-blue-500 mr-1">✏️</button>
                         <button type="button" onclick="deleteRecord('${r.id}')" class="text-gray-400 hover:text-red-600">✕</button>
-                    `;
+                    </td>`;
                 tbody.appendChild(tr);
             });
 
@@ -659,7 +672,7 @@
                 ...records[idx],
                 date: document.getElementById('editDate').value,
                 type: document.getElementById('editType').value,
-                name: document.getElementById('editName').value.trim(),
+                name: document.getElementById('name').value.trim(),
                 quantity: q,
                 unit: u,
                 shares: ((u === '張' || u === '张') ? q * 1000 : q),
