@@ -1,0 +1,30 @@
+export async function onRequestGet(context) {
+  try {
+    const url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json";
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    });
+
+    if (!response.ok) {
+      return new Response(JSON.stringify({ success: false, error: "TWSE API error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const data = await response.json();
+    return new Response(JSON.stringify({ success: true, data: data.data }), {
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
