@@ -104,8 +104,8 @@
 
         <!-- 交易流水明細表 -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <!-- 修正後的工具列，確保與表格保持安全距離、絕不重疊 -->
-            <div class="p-3 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 bg-gray-50 mb-2">
+            <!-- 嚴格拉開與下方表格的距離 (mb-6)，絕不重疊 -->
+            <div class="p-3 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3 bg-gray-50 mb-6">
                 <div class="flex items-center gap-2.5 flex-wrap">
                     <h2 class="font-semibold text-xs md:text-sm text-gray-800">📜 買賣流水帳</h2>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -115,7 +115,7 @@
                     <input type="text" id="searchStockInput" placeholder="🔍 搜股票(簡繁通用)..." class="px-2 py-0.5 text-xs border rounded-md outline-none w-36 md:w-44 bg-white">
                     
                     <span id="autoFetchStatus" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-300 px-2.5 py-1 rounded">
-                        <span id="fetchIcon">⚡</span><span id="fetchText">開機自動抓取實價中...</span>
+                        <span id="fetchIcon">⚡</span><span id="fetchText">自動動態抓取實價</span>
                     </span>
 
                     <span class="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
@@ -218,7 +218,8 @@
             "群創": "3481", "群创": "3481",
             "旺宏": "2337",
             "南亞": "1303", "南亚": "1303",
-            "力積電": "6770", "力积电": "6770"
+            "力積電": "6770", "力积电": "6770",
+            "中美晶": "5483", "中美晶": "5483"
         };
 
         const DEFAULT_RECORDS = [
@@ -328,7 +329,8 @@
             { "id": "1789623830277", "date": "2026-09-17", "type": "SELL", "name": "日月光", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 61788, "isHistorical": false },
             { "id": "1789733711233", "date": "2026-09-18", "type": "BUY", "name": "亚电", "quantity": 1, "unit": "张", "shares": 1000, "price": 77.8, "discount": 0.3, "totalAmount": 77833, "isHistorical": false },
             { "id": "1789733721391", "date": "2026-09-18", "type": "SELL", "name": "亚电", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 78150, "fixedProfit": 317, "isHistorical": false },
-            { "id": "1789733747927", "date": "2026-09-18", "type": "SELL", "name": "台玻", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 58898, "isHistorical": false }
+            { "id": "1789733747927", "date": "2026-09-18", "type": "SELL", "name": "台玻", "quantity": 1, "unit": "张", "shares": 1000, "price": null, "discount": 0.3, "totalAmount": 58898, "isHistorical": false },
+            { "id": "1789999756498", "date": "2026-09-21", "type": "BUY", "name": "中美晶", "quantity": 1, "unit": "張", "shares": 1000, "price": 188.5, "discount": 0.3, "totalAmount": 188580, "isHistorical": false }
         ];
 
         let records = [];
@@ -365,8 +367,6 @@
             });
 
             renderTable();
-            
-            // 頁面載入完成後，自動觸發抓取實價
             autoFetchMarketPrices();
         });
 
