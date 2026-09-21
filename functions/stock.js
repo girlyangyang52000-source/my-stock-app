@@ -6,9 +6,9 @@ export async function onRequestGet(context) {
 
     let resultData = [];
 
-    // 透過最穩定的公開財經接口逐一獲取即時市價，確保萬無一失
     for (const code of codes) {
       try {
+        // 同時向上市 (tse) 與上櫃 (otc) 查詢即時行情
         const res = await fetch(`https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code}.tw|otc_${code}.tw`, {
           headers: { "User-Agent": "Mozilla/5.0" }
         });
