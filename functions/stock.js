@@ -4,7 +4,6 @@ export async function onRequestGet(context) {
     const codesParam = url.searchParams.get("codes") || "";
     const codes = codesParam ? codesParam.split(",") : [];
 
-    // 同時向證交所與櫃買中心官方公開 API 抓取最新市場行情
     const [twseRes, tpexRes] = await Promise.all([
       fetch("https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json").catch(() => null),
       fetch("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes").catch(() => null)
@@ -16,7 +15,6 @@ export async function onRequestGet(context) {
       const twseJson = await twseRes.json();
       if (twseJson && Array.isArray(twseJson.data)) {
         twseJson.data.forEach(item => {
-          // item[0] 為代號, item[7] 為收盤價/成交價
           if (item[0] && item[7]) {
             priceMap[String(item[0]).trim()] = String(item[7]).replace(/,/g, '').trim();
           }
