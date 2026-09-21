@@ -113,7 +113,7 @@
                     </label>
                     <input type="text" id="searchStockInput" placeholder="🔍 搜股票(簡繁通用)..." class="px-2 py-0.5 text-xs border rounded-md outline-none w-36 md:w-44 bg-white">
                     <button type="button" onclick="autoFetchMarketPrices()" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
-                        <span id="fetchIcon">🔄</span><span id="fetchText">從證交所 API 抓取即時時價</span>
+                        <span id="fetchIcon">🔄</span><span id="fetchText">從證交所 API 動態抓取即時時價</span>
                     </button>
                     <span class="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
                         <span class="inline-block w-2 h-2 rounded-full bg-white border border-gray-300 mr-1"></span>白底:庫存 
@@ -141,7 +141,7 @@
                             <th class="py-2 text-left">數量</th>
                             <th class="py-2 text-right">單價</th>
                             <th class="py-2 text-right">結算總額</th>
-                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 即時現價 (點擊按鈕向證交所 API 請求)</th>
+                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 即時現價 (點擊按鈕向後端 API 請求)</th>
                             <th class="py-2 text-right">本次損益</th>
                             <th class="py-2 text-right">報酬率</th>
                             <th class="py-2 text-center rounded-tr-lg">操作</th>
@@ -521,7 +521,6 @@
             updateLiveOverallSummary();
         }
 
-        // 透過我們剛修改好的後端 API 代理進行 100% 純動態抓價（絕無寫死）
         async function autoFetchMarketPrices() {
             const { holdingBuyIds } = calculateAutoStatus(records);
             const holdingItems = records.filter(r => r.type === 'BUY' && holdingBuyIds.has(String(r.id)));
