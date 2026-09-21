@@ -6,9 +6,9 @@ export async function onRequestGet(context) {
 
     let resultData = [];
 
-    // 動態向證交所及櫃買中心官方公開行情接口請求當下真實成交價
     for (const code of codes) {
       try {
+        // 使用公開且穩定的財經數據源通道
         const res = await fetch(`https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code}.tw|otc_${code}.tw`, {
           headers: { "User-Agent": "Mozilla/5.0" }
         });
@@ -16,14 +16,13 @@ export async function onRequestGet(context) {
         
         if (json && Array.isArray(json.msgArray) && json.msgArray.length > 0) {
           const item = json.msgArray[0];
-          // 優先取盤中成交價 (z)，若無則取昨收價 (y)
           const price = (item.z && item.z !== "-") ? item.z : (item.y && item.y !== "-" ? item.y : null);
           if (price) {
             resultData.push({ Code: code, ClosingPrice: String(price) });
           }
         }
       } catch (e) {
-        // 略過單支失敗
+        // 略過
       }
     }
 
