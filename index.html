@@ -113,7 +113,7 @@
                     </label>
                     <input type="text" id="searchStockInput" placeholder="🔍 搜股票(簡繁通用)..." class="px-2 py-0.5 text-xs border rounded-md outline-none w-36 md:w-44 bg-white">
                     <button type="button" onclick="autoFetchMarketPrices()" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
-                        <span id="fetchIcon">🔄</span><span id="fetchText">從證交所 API 動態抓取即時時價</span>
+                        <span id="fetchIcon">🔄</span><span id="fetchText">從財經 API 動態抓取即時時價</span>
                     </button>
                     <span class="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
                         <span class="inline-block w-2 h-2 rounded-full bg-white border border-gray-300 mr-1"></span>白底:庫存 
@@ -141,7 +141,7 @@
                             <th class="py-2 text-left">數量</th>
                             <th class="py-2 text-right">單價</th>
                             <th class="py-2 text-right">結算總額</th>
-                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 即時現價 (點擊按鈕向後端 API 請求)</th>
+                            <th class="py-2 text-center bg-slate-800 text-amber-300">💡 即時現價 (點擊按鈕動態抓取市價)</th>
                             <th class="py-2 text-right">本次損益</th>
                             <th class="py-2 text-right">報酬率</th>
                             <th class="py-2 text-center rounded-tr-lg">操作</th>
@@ -545,26 +545,25 @@
 
             const btnIcon = document.getElementById('fetchIcon'), btnText = document.getElementById('fetchText');
             btnIcon.classList.add('animate-spin'); 
-            btnText.innerText = "正在向證交所 API 請求...";
+            btnText.innerText = "正在動態抓取最新時價...";
 
-            try {
-                const res = await fetch(`/stock?codes=${targetCodes.join(',')}`);
-                const result = await res.json();
-                
-                if (result.success && Array.isArray(result.data)) {
-                    const priceMap = {};
-                    result.data.forEach(item => {
-                        if (item.Code && item.ClosingPrice) {
-                            priceMap[String(item.Code).trim()] = parseFloat(String(item.ClosingPrice).replace(/,/g, ''));
-                        }
-                    });
+            let updatedCount = 0;
 
-                    let updatedCount = 0;
-                    holdingItems.forEach(r => {
-                        const cleanName = r.name.trim().replace(/^[0-9A-Za-z]+/, '').trim();
-                        const code = STOCK_CODE_MAP[r.name.trim()] || STOCK_CODE_MAP[cleanName];
-                        const livePrice = code ? priceMap[code] : null;
+            for (const r of holdingItems) {
+                const cleanName = r.name.trim().replace(/^[0-9A-Za-z]+/, '').trim();
+                const code = STOCK_CODE_MAP[r.name.trim()] || STOCK_CODE_MAP[cleanName];
+                if (!code) continue;
 
+                try {
+                    const proxyUrl = `https://api.allorigins.win/get?url=` + encodeURIComponent(`https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code}.tw|otc_${code}.tw`);
+                    const res = await fetch(proxyUrl);
+                    const data = await res.json();
+                    const json = JSON.parse(data.contents);
+                    
+                    if (json && Array.isArray(json.msgArray) && json.msgArray.length > 0) {
+                        const item = json.msgArray[0];
+                        const livePrice = (item.z && item.z !== "-") ? parseFloat(item.z) : ((item.y && item.y !== "-") ? parseFloat(item.y) : null);
+                        
                         if (livePrice && !isNaN(livePrice) && livePrice > 0) {
                             livePriceCache[r.id] = String(livePrice);
                             const inp = document.getElementById(`live-input-${r.id}`);
@@ -573,17 +572,15 @@
                             onLivePriceChange(r.id, Math.abs(parseFloat(r.totalAmount) || 0), getRecordShares(r), discount, String(livePrice));
                             updatedCount++;
                         }
-                    });
-                    btnText.innerText = updatedCount > 0 ? `成功動態抓取 ${updatedCount} 檔時價` : "未在 API 找到對應代號";
-                } else {
-                    btnText.innerText = "API 回應格式異常";
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
-            } catch (err) {
-                btnText.innerText = "無法連線至後端 API";
-            } finally {
-                btnIcon.classList.remove('animate-spin');
-                setTimeout(() => { btnText.innerText = "從證交所 API 抓取即時時價"; }, 3000);
             }
+
+            btnIcon.classList.remove('animate-spin');
+            btnText.innerText = updatedCount > 0 ? `成功抓取 ${updatedCount} 檔時價` : "抓取完成";
+            setTimeout(() => { btnText.innerText = "從財經 API 動態抓取即時時價"; }, 3000);
         }
 
         function renderTable() {
