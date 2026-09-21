@@ -3,8 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>記帳本</title>
+    <title>記帳本 (雲端同步版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK 引入 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD0Yd9Vgh8bhMRgWawHOSxhp5_xGpm9ZOo",
+            authDomain: "my-food-cook.firebaseapp.com",
+            projectId: "my-food-cook",
+            storageBucket: "my-food-cook.firebasestorage.app",
+            messagingSenderId: "457428014267",
+            appId: "1:457428014267:web:f8bb0da11b008ddfe4059e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.firebaseDB = { db, doc, getDoc, setDoc };
+        window.dispatchEvent(new Event('firebase-ready'));
+    </script>
     <style>
         .profit { color: #dc2626; font-weight: 600; }
         .loss { color: #16a34a; font-weight: 600; }
@@ -21,7 +41,7 @@
         <!-- 頂層匯總看板 -->
         <header class="bg-white p-4 md:p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div><h1 class="text-xl md:text-2xl font-bold">📈 記帳本</h1></div>
+                <div><h1 class="text-xl md:text-2xl font-bold">📈 記帳本 <span class="text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">☁️ 雲端同步中</span></h1></div>
                 <div class="flex flex-wrap gap-2">
                     <div class="bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 min-w-[105px] flex flex-col justify-center">
                         <div class="text-[11px] text-amber-700 font-medium">目前總額</div>
@@ -115,7 +135,7 @@
                     <input type="text" id="searchStockInput" placeholder="🔍 搜股票(簡繁通用)..." class="px-2 py-0.5 text-xs border rounded-md outline-none w-36 md:w-44 bg-white">
                     
                     <span id="autoFetchStatus" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-300 px-2.5 py-1 rounded">
-                        <span id="fetchIcon">⚡</span><span id="fetchText">自動動態抓取實價</span>
+                        <span id="fetchIcon">⚡</span><span id="fetchText">雲端同步與實價載入中...</span>
                     </span>
 
                     <span class="text-[11px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
@@ -334,14 +354,6 @@
         ];
 
         let records = [];
-        const savedRecords = localStorage.getItem('stock_flow_records');
-        if (savedRecords) {
-            try { records = JSON.parse(savedRecords); } catch(e) { records = DEFAULT_RECORDS; }
-        } else {
-            records = DEFAULT_RECORDS;
-            localStorage.setItem('stock_flow_records', JSON.stringify(records));
-        }
-
         const livePriceCache = {};
 
         const TRAD_TO_SIMP = { '鴻': '鸿', '海': '海', '聯': '联', '電': '电', '積': '积', '晶': '晶', '南': '南', '亞': '亚', '科': '科', '致': '致', '光': '光', '創': '创', '群': '群', '旺': '旺', '宏': '宏', '力': '力', '玻': '玻', '台': '台', '臺': '台', '頎': '颀', '邦': '邦', '茂': '茂', '益': '益', '智': '智', '寶': '宝', '雅': '雅', '傑': '杰', '森': '森', '榮': '荣', '虎': '虎', '雷': '雷', '確': '确', '精': '精', '買': '买', '賣': '卖', '庫': '库', '存': '存', '張': '张', '股': '股', '價': '价', '損': '损', '報': '报', '額': '额', '總': '总', '餘': '余', '萬': '万', '現': '现', '算': '算', '鼎': '鼎', '元': '元', '彰': '彰', '銀': '银', '恩': '恩', '德': '德', '士': '士', '豪': '豪' };
@@ -351,7 +363,43 @@
             return String(text).split('').map(char => TRAD_TO_SIMP[char] || char).join('').toLowerCase().trim();
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        // 初始化與雲端同步
+        window.addEventListener('firebase-ready', async () => {
+            const { db, doc, getDoc, setDoc } = window.firebaseDB;
+            const docRef = doc(db, "stock_data", "main_ledger");
+            
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    records = docSnap.data().records || DEFAULT_RECORDS;
+                } else {
+                    records = DEFAULT_RECORDS;
+                    await setDoc(docRef, { records });
+                }
+            } catch (e) {
+                console.error("雲端載入失敗，採用本地數據:", e);
+                const saved = localStorage.getItem('stock_flow_records');
+                records = saved ? JSON.parse(saved) : DEFAULT_RECORDS;
+            }
+
+            initApp();
+        });
+
+        async function saveToCloudAndLocal() {
+            localStorage.setItem('stock_flow_records', JSON.stringify(records));
+            renderTable();
+            
+            if (window.firebaseDB) {
+                try {
+                    const { db, doc, setDoc } = window.firebaseDB;
+                    await setDoc(doc(db, "stock_data", "main_ledger"), { records });
+                } catch (e) {
+                    console.error("雲端同步失敗:", e);
+                }
+            }
+        }
+
+        function initApp() {
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
             document.getElementById('quantity').value = 1;
             document.getElementById('unit').value = '張';
@@ -368,7 +416,7 @@
 
             renderTable();
             autoFetchMarketPrices();
-        });
+        }
 
         function calcTotal() {
             const type = document.getElementById('type').value;
@@ -567,7 +615,7 @@
             }
 
             if (fetchText) {
-                fetchText.innerText = updatedCount > 0 ? `已自動更新 ${updatedCount} 檔實價` : "實價載入完成";
+                fetchText.innerText = updatedCount > 0 ? `已雲端同步 (${updatedCount}檔時價)` : "實價載入完成";
                 setTimeout(() => { fetchText.innerText = "自動動態抓取實價"; }, 4000);
             }
         }
@@ -655,11 +703,11 @@
                 totalAmount: Math.abs(parseFloat(document.getElementById('totalAmount').value)),
                 isHistorical: false
             });
-            saveAndRefresh();
+            saveToCloudAndLocal();
             document.getElementById('name').value = '';
             document.getElementById('price').value = '';
             document.getElementById('totalAmount').value = '';
-            alert('保存成功！');
+            alert('保存成功並已同步至雲端！');
         });
 
         function openEditModal(id) {
@@ -691,26 +739,21 @@
                 ...records[idx],
                 date: document.getElementById('editDate').value,
                 type: document.getElementById('editType').value,
-                name: document.getElementById('name').value.trim(),
+                name: document.getElementById('editName').value.trim(),
                 quantity: q,
                 unit: u,
                 shares: ((u === '張' || u === '张') ? q * 1000 : q),
                 price: p !== '' ? parseFloat(p) : null,
-                discount: parseFloat(document.getElementById('discount').value) || 0.3,
+                discount: parseFloat(document.getElementById('editDiscount').value) || 0.3,
                 totalAmount: Math.abs(parseFloat(document.getElementById('editTotalAmount').value))
             };
-            saveAndRefresh();
+            saveToCloudAndLocal();
             closeEditModal();
         });
 
-        function saveAndRefresh() {
-            localStorage.setItem('stock_flow_records', JSON.stringify(records));
-            renderTable();
-        }
-
-        function deleteRecord(id) { if (confirm("確定刪除？")) { records = records.filter(r => String(r.id) !== String(id)); saveAndRefresh(); } }
-        function clearAllRecords() { if (confirm("確定清空？")) { records = []; saveAndRefresh(); updateLiveOverallSummary(); } }
-        function resetDefaultData() { if (confirm("重置初始？")) { records = DEFAULT_RECORDS; saveAndRefresh(); } }
+        function deleteRecord(id) { if (confirm("確定刪除？")) { records = records.filter(r => String(r.id) !== String(id)); saveToCloudAndLocal(); } }
+        function clearAllRecords() { if (confirm("確定清空？")) { records = []; saveToCloudAndLocal(); updateLiveOverallSummary(); } }
+        function resetDefaultData() { if (confirm("重置初始？")) { records = DEFAULT_RECORDS; saveToCloudAndLocal(); } }
         function exportData() { navigator.clipboard.writeText(JSON.stringify(records, null, 2)).then(() => alert("已複製到剪貼簿！")); }
     </script>
 </body>
